@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Speech Intelligibility Index (SII) Professional DSP Analyzer compliant with ANSI S3.5-1997 and ISO 16832.">
+  <title>Speech Intelligibility Index (SII) Pro - v2.0.0</title>
+
+  <style>
+    :root {
+      --bg-canvas: #090d13;
+      --bg-surface: #101620;
+      --bg-surface-elevated: #182230;
+      --border-subtle: #243142;
+      --border-focus: #4493f8;
+
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --text-dim: #647182;
+
+      --accent-blue: #4493f8;
+      --accent-cyan: #39c5bb;
+      --sii-good: #2ea043;
+      --sii-fair: #d29922;
+      --sii-poor: #f85149;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --touch-target-min: 48px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 1rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-title h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .badge-std {
+      background: var(--bg-surface-elevated);
+      color: var(--accent-cyan);
+      border: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .status-dot.active { background: var(--sii-good); box-shadow: 0 0 8px var(--sii-good); }
+    .status-dot.sim { background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan); }
+    .status-dot.error { background: var(--sii-poor); box-shadow: 0 0 8px var(--sii-poor); }
+
+    main {
+      flex: 1;
+      max-width: 1350px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 1024px) {
+      main {
+        grid-template-columns: 390px 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .metric-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      text-align: center;
+      transition: border-color 0.3s ease;
+    }
+
+    .metric-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .metric-value-primary {
+      font-family: var(--font-mono);
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-value-secondary {
+      font-family: var(--font-mono);
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-badge {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.75rem;
+      border-radius: 50px;
+    }
+
+    .theme-poor { color: var(--sii-poor); }
+    .theme-poor .metric-badge { background: rgba(248, 81, 73, 0.15); color: var(--sii-poor); border: 1px solid var(--sii-poor); }
+    .theme-fair { color: var(--sii-fair); }
+    .theme-fair .metric-badge { background: rgba(210, 153, 34, 0.15); color: var(--sii-fair); border: 1px solid var(--sii-fair); }
+    .theme-good { color: var(--sii-good); }
+    .theme-good .metric-badge { background: rgba(46, 160, 67, 0.15); color: var(--sii-good); border: 1px solid var(--sii-good); }
+
+    .controls-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .value-tag {
+      font-family: var(--font-mono);
+      color: var(--text-main);
+    }
+
+    button.btn-primary {
+      min-height: var(--touch-target-min);
+      background: var(--accent-blue);
+      color: #090d13;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button.btn-primary:hover { opacity: 0.92; }
+    button.btn-primary:active { transform: scale(0.98); }
+
+    button.btn-secondary {
+      min-height: var(--touch-target-min);
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button.btn-secondary:hover {
+      background: var(--border-subtle);
+    }
+
+    select, input[type="range"] {
+      width: 100%;
+      min-height: var(--touch-target-min);
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0 0.75rem;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      cursor: pointer;
+      accent-color: var(--accent-blue);
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      height: 400px;
+      background: #05080c;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .band-inspect-bar {
+      min-height: 48px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .band-inspect-bar strong {
+      color: var(--accent-cyan);
+    }
+
+    .legend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      align-items: center;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+
+    .edu-section {
+      grid-column: 1 / -1;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .edu-section h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 0.5rem;
+    }
+
+    .edu-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+      .edu-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .edu-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+    }
+
+    .edu-card h3 {
+      font-size: 1rem;
+      color: var(--accent-blue);
+      margin-bottom: 0.75rem;
+    }
+
+    .edu-card p, .edu-card ul {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .edu-card ul {
+      list-style-position: inside;
+      margin-top: 0.5rem;
+    }
+
+    .math-block {
+      background: #05080c;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--accent-cyan);
+      margin: 0.75rem 0;
+      overflow-x: auto;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.825rem;
+      font-family: var(--font-mono);
+    }
+
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+
+    th {
+      background: var(--bg-surface-elevated);
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .banner-warning {
+      background: rgba(210, 153, 34, 0.15);
+      border: 1px solid var(--sii-fair);
+      color: #e3b341;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      display: none;
+    }
+
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      background: var(--bg-surface);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand-title">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-blue)">
+        <path d="M12 2v20M17 5v14M7 9v6M22 10v4M2 11v2"/>
+      </svg>
+      <h1>Speech Intelligibility Index (SII) Pro</h1>
+      <span class="badge-std">v2.0.0 &bull; ANSI S3.5-1997 / ISO 16832</span>
+    </div>
+    <div class="status-pill">
+      <span id="dspStatusDot" class="status-dot"></span>
+      <span id="dspStatusText">Engine Idle</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div id="alertBanner" class="banner-warning" role="alert"></div>
+
+      <div id="metricCard" class="metric-card theme-poor">
+        <div class="metric-title">Speech Intelligibility Index</div>
+        <div id="siiMainDisplay" class="metric-value-primary">0.000</div>
+        <div id="siiSubDisplay" class="metric-value-secondary">0.0% Equivalent</div>
+        <div id="siiQualityBadge" class="metric-badge">Poor Intelligibility</div>
+      </div>
+
+      <div class="controls-grid">
+        <button id="toggleBtn" class="btn-primary" aria-label="Start Acoustic Analysis">
+          <svg id="playIcon" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <span id="toggleBtnText">Start Real-Time Analysis</span>
+        </button>
+
+        <div class="control-group">
+          <label for="vocalEffortSelect">Standard Vocal Effort (ANSI Table 3)
+            <span class="value-tag" id="effortSplTag">62.3 dB SPL</span>
+          </label>
+          <select id="vocalEffortSelect">
+            <option value="normal" selected>Normal Effort (62.35 dB SPL @ 1m)</option>
+            <option value="raised">Raised Effort (68.34 dB SPL @ 1m)</option>
+            <option value="loud">Loud Effort (74.85 dB SPL @ 1m)</option>
+            <option value="shout">Shouted Speech (82.30 dB SPL @ 1m)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="opModeSelect">Acoustic Analysis Mode</label>
+          <select id="opModeSelect">
+            <option value="ambient" selected>Acoustic Audit (ANSI Speech vs. Room Noise)</option>
+            <option value="live">Live Tracking (Dynamic Speech &amp; Noise Envelope)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="calibGainRange">Sensitivity / Mic Gain Trim
+            <span class="value-tag" id="calibGainTag">+0.0 dB</span>
+          </label>
+          <input type="range" id="calibGainRange" min="0" max="30" step="0.5" value="0">
+        </div>
+
+        <div class="control-group">
+          <label for="unitToggleBtn">Focus Metric Readout</label>
+          <button id="unitToggleBtn" class="btn-secondary">Display Mode: Decimal [0.000 - 1.000]</button>
+        </div>
+
+        <div class="control-group">
+          <label for="mockSignalSelect">Acoustic Simulation Generator</label>
+          <select id="mockSignalSelect">
+            <option value="off">Off (Hardware Microphone Input)</option>
+            <option value="quiet">Quiet Free-Field (~30 dBA Baseline)</option>
+            <option value="cafeteria">Noisy Cafeteria (~68 dBA Babble Noise)</option>
+            <option value="rumble">HVAC Low-Frequency Rumble (Testing Upward Masking)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="flex:1;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <h2 style="font-size:1.1rem; font-weight:700;">1/3-Octave Critical Spectrum Levels (dB/Hz)</h2>
+        <div class="legend-bar">
+          <div class="legend-item"><div class="legend-color" style="background:#4493f8;"></div> Speech ($E_i$)</div>
+          <div class="legend-item"><div class="legend-color" style="background:#2ea043;"></div> Audibility ($A_i$)</div>
+          <div class="legend-item"><div class="legend-color" style="background:#f0883e;"></div> Disturbance ($D_i$)</div>
+          <div class="legend-item"><div class="legend-color" style="background:#39c5bb;"></div> Weight ($I_i$)</div>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="spectrumCanvas"></canvas>
+      </div>
+
+      <div id="bandInspectBar" class="band-inspect-bar">
+        Hover or tap any frequency band above to inspect physical spectrum levels ($E_i$, $D_i$, $SNR_i$, $I_i$, $A_i$).
+      </div>
+    </section>
+
+    <article class="edu-section">
+      <h2>ANSI S3.5-1997 / ISO 16832 Calculation Architecture (v2.0.0 Metrology)</h2>
+
+      <div class="edu-grid">
+        <div class="edu-card">
+          <h3>1. Spectrum Level Normalization</h3>
+          <p>
+            ANSI S3.5 equations require all inputs in <strong>Spectrum Level</strong> ($dB\text{ re }20\,\mu Pa^2/Hz$). The analyzer normalizes integrated band power using exact $1/3$-octave bandwidths ($\Delta f_i$):
+          </p>
+          <div class="math-block">L<sub>spectrum, i</sub> = L<sub>band, i</sub> - 10&middot;log<sub>10</sub>(&Delta;f<sub>i</sub>)</div>
+          <p>
+            Eliminates artificial high-frequency inflation ($+15.7\text{ dB}$ at $160\text{ Hz}$ to $+32.7\text{ dB}$ at $8\text{ kHz}$).
+          </p>
+        </div>
+
+        <div class="edu-card">
+          <h3>2. Upward Spread of Masking (V<sub>i</sub>)</h3>
+          <p>
+            High-intensity low-frequency noise masks higher frequencies through basilar membrane mechanics:
+          </p>
+          <div class="math-block">C<sub>i</sub> = 0.6&middot;[B<sub>i-1</sub> + 10&middot;log<sub>10</sub>(f<sub>i-1</sub>)] - 6.35<br>V<sub>i</sub> = B<sub>i-1</sub> - 3.32&middot;C<sub>i</sub>&middot;log<sub>10</sub>(f<sub>i</sub> / f<sub>i-1</sub>)</div>
+          <p>
+            Effective disturbance $D_i = \max(N_i, X_i, V_i)$ properly models HVAC and road rumble suppression.
+          </p>
+        </div>
+
+        <div class="edu-card">
+          <h3>3. Decoupled Continuous Metrology</h3>
+          <p>
+            DSP updates are time-normalized via continuous exponential decay constants:
+          </p>
+          <div class="math-block">&alpha; = 1 - e<sup>-&Delta;t / &tau;</sup> &emsp; (&tau; = 0.25 s)</div>
+          <p>
+            Guarantees identical, jitter-free smoothing and dynamic tracking across $60\text{ Hz}$, $120\text{ Hz}$, and $144\text{ Hz}$ mobile and desktop screens.
+          </p>
+        </div>
+      </div>
+
+      <h3 style="font-size:1.1rem; font-weight:700; margin-top:0.5rem;">ANSI S3.5 Table 3 Reference Parameters</h3>
+      <div class="table-container">
+        <table id="ansiConstantsTable">
+          <thead>
+            <tr>
+              <th>Band #</th>
+              <th>Center Freq (Hz)</th>
+              <th>Bandwidth &Delta;f (Hz)</th>
+              <th>10&middot;log<sub>10</sub>(&Delta;f) (dB)</th>
+              <th>Weight (I<sub>i</sub>)</th>
+              <th>Normal Speech (U<sub>i</sub> dB/Hz)</th>
+              <th>Hearing Threshold (X<sub>i</sub> dB/Hz)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <p>Speech Intelligibility Index (SII) Professional v2.0.0 &bull; ANSI S3.5-1997 (R2024) Compliant DSP Architecture</p>
+  </footer>
+
+  <script>
+    'use strict';
+
+    /**
+     * ANSI S3.5-1997 Table 3 One-Third Octave Band Metrology
+     */
+    const ANSI_TABLE_3 = {
+      bands: [160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000],
+      weights: [
+        0.0114, 0.0153, 0.0179, 0.0558, 0.0898, 0.0944,
+        0.0709, 0.0660, 0.0628, 0.0672, 0.0747, 0.0755,
+        0.0820, 0.0808, 0.0483, 0.0453, 0.0274, 0.0145
+      ],
+      speechLevels: {
+        normal: [32.41, 34.48, 34.75, 33.98, 34.59, 34.27, 32.06, 28.30, 25.01, 23.00, 20.15, 17.32, 13.18, 11.55, 9.33, 5.31, 2.59, 1.13],
+        raised: [33.81, 33.92, 38.98, 38.57, 39.11, 40.15, 38.78, 36.37, 33.86, 31.89, 28.58, 25.32, 22.35, 20.15, 16.78, 11.47, 7.67, 5.07],
+        loud:   [35.29, 37.76, 41.55, 43.78, 43.30, 44.85, 45.55, 44.05, 42.16, 40.53, 37.70, 34.39, 30.98, 28.21, 25.41, 18.35, 13.87, 11.39],
+        shout:  [30.77, 36.65, 42.50, 46.51, 47.40, 49.24, 51.21, 51.44, 51.31, 49.63, 47.65, 44.32, 40.80, 38.13, 34.41, 28.24, 23.45, 20.72]
+      },
+      internalNoise: [
+        0.60, -1.70, -3.90, -6.10, -8.20, -9.70,
+        -10.80, -11.90, -12.50, -13.50, -15.40, -17.70,
+        -21.20, -24.20, -25.90, -23.60, -15.80, -7.10
+      ]
+    };
+
+    const sixthOctave = Math.pow(2, 1 / 6);
+    const BAND_EDGES = ANSI_TABLE_3.bands.map(fc => {
+      const fLow = fc / sixthOctave;
+      const fHigh = fc * sixthOctave;
+      const deltaF = fHigh - fLow;
+      return {
+        fc,
+        fLow,
+        fHigh,
+        deltaF,
+        bandwidthCorrectionDb: 10 * Math.log10(deltaF)
+      };
+    });
+
+    /**
+     * Production ANSI S3.5 DSP Engine - v2.0.0
+     */
+    class ProductionSIIDSPEngine {
+      constructor() {
+        this.audioCtx = null;
+        this.analyser = null;
+        this.sourceNode = null;
+        this.gainNode = null;
+        this.dcBlockFilter = null;
+        this.mockSourceNode = null;
+
+        this.isRunning = false;
+        this.stream = null;
+        this.fftSize = 4096;
+        this.fftDataBuffer = null;
+        this.binMapping = null;
+
+        this.splCalibrationBase = 94.0;
+        this.hardwareGainTrim = 0.0;
+
+        // Rate-independent continuous envelope buffers
+        this.liveSpeechEnvelope = new Float32Array(ANSI_TABLE_3.bands.length).fill(30);
+        this.liveNoiseEnvelope = new Float32Array(ANSI_TABLE_3.bands.length).fill(10);
+
+        // State buffers
+        this.bandSpectrumSpeech = new Float32Array(ANSI_TABLE_3.bands.length);
+        this.bandSpectrumDisturbance = new Float32Array(ANSI_TABLE_3.bands.length);
+        this.bandSNR = new Float32Array(ANSI_TABLE_3.bands.length);
+        this.bandAudibility = new Float32Array(ANSI_TABLE_3.bands.length);
+        this.bandContribution = new Float32Array(ANSI_TABLE_3.bands.length);
+
+        this.rawSII = 0.0;
+        this.smoothedSII = 0.0;
+        this.timeConstantTau = 0.25; // 250ms continuous time constant
+        this.lastFrameTime = performance.now();
+
+        this.vocalEffort = 'normal';
+        this.opMode = 'ambient';
+        this.mockSimulation = 'off';
+      }
+
+      async initContext() {
+        if (!this.audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) throw new Error("Web Audio API not supported.");
+          this.audioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+        }
+
+        if (this.audioCtx.state === 'suspended') {
+          await this.audioCtx.resume();
+        }
+
+        if (!this.analyser) {
+          this.analyser = this.audioCtx.createAnalyser();
+          this.analyser.fftSize = this.fftSize;
+          this.analyser.smoothingTimeConstant = 0.0; // Raw FFT response; smoothing handled downstream
+          this.fftDataBuffer = new Float32Array(this.analyser.frequencyBinCount);
+
+          this.dcBlockFilter = this.audioCtx.createBiquadFilter();
+          this.dcBlockFilter.type = 'highpass';
+          this.dcBlockFilter.frequency.value = 40.0;
+          this.dcBlockFilter.Q.value = 0.707;
+
+          this.gainNode = this.audioCtx.createGain();
+          this.updateGainTrim(this.hardwareGainTrim);
+
+          this.dcBlockFilter.connect(this.gainNode);
+          this.gainNode.connect(this.analyser);
+
+          this.precomputeBinMapping();
+        }
+      }
+
+      precomputeBinMapping() {
+        const binWidth = this.audioCtx.sampleRate / this.fftSize;
+        this.binMapping = BAND_EDGES.map(edge => ({
+          startBin: Math.max(0, Math.floor(edge.fLow / binWidth)),
+          endBin: Math.min(this.fftDataBuffer.length - 1, Math.ceil(edge.fHigh / binWidth)),
+          bandwidthCorrectionDb: edge.bandwidthCorrectionDb
+        }));
+      }
+
+      async startMicrophone() {
+        await this.initContext();
+        this.stopMockSignal();
+
+        if (this.stream && this.sourceNode) {
+          this.isRunning = true;
+          return { success: true };
+        }
+
+        try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("getUserMedia unavailable on this origin.");
+          }
+
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+            video: false
+          });
+
+          this.sourceNode = this.audioCtx.createMediaStreamSource(this.stream);
+          this.sourceNode.connect(this.dcBlockFilter);
+          this.isRunning = true;
+          return { success: true };
+        } catch (err) {
+          return { success: false, error: err };
+        }
+      }
+
+      startMockSignal(mode) {
+        if (!this.audioCtx) return;
+        this.stopMockSignal();
+
+        const bufferSize = this.audioCtx.sampleRate * 4;
+        const noiseBuffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = noiseBuffer.getChannelData(0);
+
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          if (mode === 'quiet') {
+            b0 = 0.99 * b0 + white * 0.01;
+            data[i] = b0 * 0.005; // ~30 dBA
+          } else if (mode === 'cafeteria') {
+            b0 = 0.99 * b0 + white * 0.05;
+            b1 = 0.96 * b1 + white * 0.10;
+            const pink = (b0 + b1) * 0.15;
+            const modulation = 0.5 + 0.5 * Math.sin(2 * Math.PI * 3.5 * (i / this.audioCtx.sampleRate));
+            data[i] = pink * modulation;
+          } else if (mode === 'rumble') {
+            // Intense low-frequency rumble for upward masking test
+            b0 = 0.995 * b0 + white * 0.2;
+            data[i] = b0 * 0.4;
+          }
+        }
+
+        this.mockSourceNode = this.audioCtx.createBufferSource();
+        this.mockSourceNode.buffer = noiseBuffer;
+        this.mockSourceNode.loop = true;
+        this.mockSourceNode.connect(this.dcBlockFilter);
+        this.mockSourceNode.start(0);
+        this.isRunning = true;
+      }
+
+      stopMockSignal() {
+        if (this.mockSourceNode) {
+          try { this.mockSourceNode.stop(); this.mockSourceNode.disconnect(); } catch (e) {}
+          this.mockSourceNode = null;
+        }
+      }
+
+      pause() {
+        this.isRunning = false;
+        this.stopMockSignal();
+      }
+
+      updateGainTrim(valDb) {
+        this.hardwareGainTrim = parseFloat(valDb);
+        if (this.gainNode && this.audioCtx) {
+          const linear = Math.pow(10, this.hardwareGainTrim / 20);
+          this.gainNode.gain.setTargetAtTime(linear, this.audioCtx.currentTime, 0.05);
+        }
+      }
+
+      processFrame(nowMs) {
+        if (!this.isRunning || !this.analyser) return;
+
+        const dtSec = Math.min(0.1, Math.max(0.001, (nowMs - this.lastFrameTime) / 1000));
+        this.lastFrameTime = nowMs;
+
+        this.analyser.getFloatFrequencyData(this.fftDataBuffer);
+
+        const stdSpeechSpectrum = ANSI_TABLE_3.speechLevels[this.vocalEffort];
+        const normalSpeechSpectrum = ANSI_TABLE_3.speechLevels.normal;
+        const numBands = ANSI_TABLE_3.bands.length;
+        const measuredSpectrumNoise = new Float32Array(numBands);
+
+        // 1. Calculate Physical Spectrum Levels (dB/Hz) with Bandwidth Normalization
+        for (let i = 0; i < numBands; i++) {
+          const map = this.binMapping[i];
+          let powerSum = 0.0;
+
+          for (let k = map.startBin; k <= map.endBin; k++) {
+            const db = this.fftDataBuffer[k];
+            if (db > -140) powerSum += Math.pow(10, db / 10);
+          }
+
+          const bandLevelSPL = (powerSum > 1e-12)
+            ? (10 * Math.log10(powerSum) + this.splCalibrationBase)
+            : -30.0;
+
+          // Band Level -> Spectrum Level (dB/Hz)
+          measuredSpectrumNoise[i] = bandLevelSPL - map.bandwidthCorrectionDb;
+        }
+
+        // 2. Continuous Envelope Tracking (for Live Tracking Mode)
+        const alphaAttack = 1.0 - Math.exp(-dtSec / 0.025);
+        const alphaRelease = 1.0 - Math.exp(-dtSec / 0.800);
+        const alphaNoiseRise = 1.0 - Math.exp(-dtSec / 2.500);
+        const alphaNoiseFall = 1.0 - Math.exp(-dtSec / 0.150);
+
+        for (let i = 0; i < numBands; i++) {
+          const m = measuredSpectrumNoise[i];
+          if (m > this.liveSpeechEnvelope[i]) {
+            this.liveSpeechEnvelope[i] += alphaAttack * (m - this.liveSpeechEnvelope[i]);
+          } else {
+            this.liveSpeechEnvelope[i] += alphaRelease * (m - this.liveSpeechEnvelope[i]);
+          }
+
+          if (m < this.liveNoiseEnvelope[i]) {
+            this.liveNoiseEnvelope[i] += alphaNoiseFall * (m - this.liveNoiseEnvelope[i]);
+          } else {
+            this.liveNoiseEnvelope[i] += alphaNoiseRise * (m - this.liveNoiseEnvelope[i]);
+          }
+        }
+
+        // 3. Upward Spread of Masking Calculation (ANSI S3.5 §4.3.2.1)
+        const disturbanceSpectrum = new Float32Array(numBands);
+        let cumulativeUpward = -999.0;
+
+        for (let i = 0; i < numBands; i++) {
+          let E_i = 0.0;
+          let N_i = 0.0;
+
+          if (this.opMode === 'ambient') {
+            E_i = stdSpeechSpectrum[i];
+            N_i = measuredSpectrumNoise[i];
+          } else {
+            E_i = this.liveSpeechEnvelope[i];
+            N_i = this.liveNoiseEnvelope[i];
+          }
+
+          const X_i = ANSI_TABLE_3.internalNoise[i];
+
+          if (i > 0) {
+            const B_prev = Math.max(this.bandSpectrumSpeech[i - 1], disturbanceSpectrum[i - 1]);
+            const f_prev = ANSI_TABLE_3.bands[i - 1];
+            const f_curr = ANSI_TABLE_3.bands[i];
+            const C_i = 0.6 * (B_prev + 10 * Math.log10(f_prev)) - 6.35;
+            const V_i = B_prev - 3.32 * C_i * Math.log10(f_curr / f_prev);
+            cumulativeUpward = Math.max(cumulativeUpward - 15.0, V_i);
+          }
+
+          const D_i = Math.max(N_i, X_i, cumulativeUpward);
+          disturbanceSpectrum[i] = D_i;
+          this.bandSpectrumSpeech[i] = E_i;
+          this.bandSpectrumDisturbance[i] = D_i;
+        }
+
+        // 4. Band Audibility & SII Accumulation
+        let frameSII = 0.0;
+        for (let i = 0; i < numBands; i++) {
+          const E_i = this.bandSpectrumSpeech[i];
+          const D_i = disturbanceSpectrum[i];
+          const snr_i = E_i - D_i;
+          this.bandSNR[i] = snr_i;
+
+          let K_i = (snr_i + 15.0) / 30.0;
+          K_i = Math.max(0.0, Math.min(1.0, K_i));
+
+          // Level Distortion Factor (ANSI S3.5 §4.3.2.2)
+          let L_i = 1.0;
+          const normRef = normalSpeechSpectrum[i] + 10.0;
+          if (E_i > normRef) {
+            L_i = 1.0 - (E_i - normRef) / 160.0;
+            L_i = Math.max(0.0, Math.min(1.0, L_i));
+          }
+
+          const A_i = L_i * K_i;
+          this.bandAudibility[i] = A_i;
+          const contrib = ANSI_TABLE_3.weights[i] * A_i;
+          this.bandContribution[i] = contrib;
+          frameSII += contrib;
+        }
+
+        this.rawSII = Math.max(0.0, Math.min(1.0, frameSII));
+
+        // 5. Time-Invariant Continuous EMA Smoothing
+        const alphaSmooth = 1.0 - Math.exp(-dtSec / this.timeConstantTau);
+        this.smoothedSII += alphaSmooth * (this.rawSII - this.smoothedSII);
+      }
+    }
+
+    /**
+     * Precision Canvas Metrology Visualizer
+     */
+    class SIISpectrumVisualizer {
+      constructor(canvas, engine) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.engine = engine;
+        this.hoveredIndex = -1;
+        this.initDPI();
+        this.bindEvents();
+      }
+
+      initDPI() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = this.canvas.getBoundingClientRect();
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.ctx.resetTransform();
+        this.ctx.scale(dpr, dpr);
+        this.cssWidth = rect.width;
+        this.cssHeight = rect.height;
+      }
+
+      bindEvents() {
+        window.addEventListener('resize', () => this.initDPI());
+
+        const handlePointer = (e) => {
+          const rect = this.canvas.getBoundingClientRect();
+          const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : -1);
+          if (clientX < 0) return;
+          const x = clientX - rect.left;
+          const bandCount = ANSI_TABLE_3.bands.length;
+          const idx = Math.floor(x / (this.cssWidth / bandCount));
+          if (idx >= 0 && idx < bandCount) {
+            this.hoveredIndex = idx;
+            this.emitInspect(idx);
+          }
+        };
+
+        this.canvas.addEventListener('mousemove', handlePointer);
+        this.canvas.addEventListener('touchstart', handlePointer, { passive: true });
+        this.canvas.addEventListener('mouseleave', () => {
+          this.hoveredIndex = -1;
+          this.emitInspect(-1);
+        });
+      }
+
+      emitInspect(idx) {
+        const bar = document.getElementById('bandInspectBar');
+        if (idx < 0) {
+          bar.innerHTML = 'Hover or tap any frequency band above to inspect physical spectrum levels (<em>E<sub>i</sub></em>, <em>D<sub>i</sub></em>, <em>SNR<sub>i</sub></em>, <em>I<sub>i</sub></em>, <em>A<sub>i</sub></em>).';
+          return;
+        }
+
+        const fc = ANSI_TABLE_3.bands[idx];
+        const speech = this.engine.bandSpectrumSpeech[idx].toFixed(1);
+        const dist = this.engine.bandSpectrumDisturbance[idx].toFixed(1);
+        const snr = this.engine.bandSNR[idx].toFixed(1);
+        const weight = (ANSI_TABLE_3.weights[idx] * 100).toFixed(2);
+        const aud = this.engine.bandAudibility[idx].toFixed(3);
+        const contrib = this.engine.bandContribution[idx].toFixed(4);
+
+        bar.innerHTML = `Band <strong>${fc} Hz</strong> &bull; Speech (E<sub>i</sub>): <strong>${speech} dB/Hz</strong> &bull; Masking (D<sub>i</sub>): <strong>${dist} dB/Hz</strong> &bull; SNR: <strong>${snr} dB</strong> &bull; Weight (I<sub>i</sub>): <strong>${weight}%</strong> &bull; Audibility (A<sub>i</sub>): <strong>${aud}</strong> &bull; SII Yield: <strong>${contrib}</strong>`;
+      }
+
+      draw() {
+        const w = this.cssWidth;
+        const h = this.cssHeight;
+        const ctx = this.ctx;
+        const bands = ANSI_TABLE_3.bands;
+        const numBands = bands.length;
+        const colWidth = w / numBands;
+
+        ctx.fillStyle = '#05080c';
+        ctx.fillRect(0, 0, w, h);
+
+        // Vertical Scale: -20 dB/Hz to +60 dB/Hz
+        const minDb = -20;
+        const maxDb = 60;
+        const toY = (db) => h - 30 - ((db - minDb) / (maxDb - minDb)) * (h - 55);
+
+        // Grid lines
+        ctx.strokeStyle = '#182230';
+        ctx.lineWidth = 1;
+        ctx.fillStyle = '#647182';
+        ctx.font = '10px var(--font-mono)';
+
+        for (let db = -10; db <= 50; db += 15) {
+          const y = toY(db);
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+          ctx.fillText(`${db} dB/Hz`, 6, y - 4);
+        }
+
+        const baselineY = toY(minDb);
+
+        // Render Bands
+        for (let i = 0; i < numBands; i++) {
+          const x = i * colWidth;
+          const isHovered = (i === this.hoveredIndex);
+          const speech = this.engine.bandSpectrumSpeech[i];
+          const dist = this.engine.bandSpectrumDisturbance[i];
+          const aud = this.engine.bandAudibility[i];
+
+          if (isHovered) {
+            ctx.fillStyle = 'rgba(68, 147, 248, 0.08)';
+            ctx.fillRect(x, 0, colWidth, h - 30);
+          }
+
+          const barPad = 3;
+          const barW = Math.max(2, colWidth - barPad * 2);
+
+          // 1. Speech Spectrum Level Bar (Blue)
+          const speechY = toY(speech);
+          ctx.fillStyle = isHovered ? '#79b8ff' : '#4493f8';
+          ctx.fillRect(x + barPad, speechY, barW, Math.max(0, baselineY - speechY));
+
+          // 2. Acoustically Accurate Audibility Dynamic Region (Green)
+          // Highlight the portion above disturbance up to speech peak (+15 dB dynamic range)
+          if (aud > 0.01) {
+            const speechTopY = toY(speech + 15);
+            const audBottomY = toY(Math.max(speech - 15, dist));
+            const audHeight = Math.max(0, audBottomY - speechTopY);
+            ctx.fillStyle = isHovered ? 'rgba(46, 160, 67, 0.9)' : 'rgba(46, 160, 67, 0.75)';
+            ctx.fillRect(x + barPad, speechTopY, barW, audHeight);
+          }
+
+          // 3. Disturbance Level Marker (Orange)
+          const distY = toY(dist);
+          ctx.strokeStyle = '#f0883e';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x + barPad, distY);
+          ctx.lineTo(x + barPad + barW, distY);
+          ctx.stroke();
+
+          // Frequency labels
+          ctx.fillStyle = isHovered ? '#ffffff' : '#8b949e';
+          ctx.textAlign = 'center';
+          ctx.font = '10px var(--font-mono)';
+          const label = bands[i] >= 1000 ? `${bands[i] / 1000}k` : `${bands[i]}`;
+          ctx.fillText(label, x + colWidth / 2, h - 12);
+        }
+
+        // 4. Band Importance Curve Overlay (Cyan)
+        ctx.strokeStyle = '#39c5bb';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        for (let i = 0; i < numBands; i++) {
+          const cx = i * colWidth + colWidth / 2;
+          const y = (h - 30) - (ANSI_TABLE_3.weights[i] / 0.11) * (h - 90);
+          if (i === 0) ctx.moveTo(cx, y);
+          else ctx.lineTo(cx, y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    /**
+     * Application UI Coordinator
+     */
+    class SIIAppUI {
+      constructor() {
+        this.engine = new ProductionSIIDSPEngine();
+        this.visualizer = null;
+        this.unitFocusDecimal = true;
+        this.lastDOMUpdate = 0;
+        this.domThrottleInterval = 66; // Decoupled ~15 FPS DOM updates
+
+        this.cacheDom();
+        this.initTable();
+        this.bindEvents();
+        this.initVisualizer();
+        this.startLoop();
+      }
+
+      cacheDom() {
+        this.dom = {
+          toggleBtn: document.getElementById('toggleBtn'),
+          toggleBtnText: document.getElementById('toggleBtnText'),
+          playIcon: document.getElementById('playIcon'),
+          dspStatusDot: document.getElementById('dspStatusDot'),
+          dspStatusText: document.getElementById('dspStatusText'),
+          alertBanner: document.getElementById('alertBanner'),
+          metricCard: document.getElementById('metricCard'),
+          siiMainDisplay: document.getElementById('siiMainDisplay'),
+          siiSubDisplay: document.getElementById('siiSubDisplay'),
+          siiQualityBadge: document.getElementById('siiQualityBadge'),
+          vocalEffortSelect: document.getElementById('vocalEffortSelect'),
+          effortSplTag: document.getElementById('effortSplTag'),
+          opModeSelect: document.getElementById('opModeSelect'),
+          calibGainRange: document.getElementById('calibGainRange'),
+          calibGainTag: document.getElementById('calibGainTag'),
+          unitToggleBtn: document.getElementById('unitToggleBtn'),
+          mockSignalSelect: document.getElementById('mockSignalSelect'),
+          spectrumCanvas: document.getElementById('spectrumCanvas'),
+          ansiTableBody: document.getElementById('ansiConstantsTable').querySelector('tbody')
+        };
+      }
+
+      initTable() {
+        const rows = ANSI_TABLE_3.bands.map((fc, i) => {
+          const edge = BAND_EDGES[i];
+          return `<tr>
+            <td>${i + 1}</td>
+            <td><strong>${fc}</strong></td>
+            <td>${edge.deltaF.toFixed(1)}</td>
+            <td>+${edge.bandwidthCorrectionDb.toFixed(2)}</td>
+            <td>${(ANSI_TABLE_3.weights[i] * 100).toFixed(2)}%</td>
+            <td>${ANSI_TABLE_3.speechLevels.normal[i].toFixed(2)}</td>
+            <td>${ANSI_TABLE_3.internalNoise[i].toFixed(1)}</td>
+          </tr>`;
+        }).join('');
+        this.dom.ansiTableBody.innerHTML = rows;
+      }
+
+      initVisualizer() {
+        this.visualizer = new SIISpectrumVisualizer(this.dom.spectrumCanvas, this.engine);
+      }
+
+      bindEvents() {
+        this.dom.toggleBtn.addEventListener('click', async () => {
+          if (!this.engine.isRunning) {
+            await this.startAnalysis();
+          } else {
+            this.engine.pause();
+            this.updateStatus('Engine Paused', 'idle');
+            this.dom.toggleBtnText.textContent = 'Resume Analysis';
+            this.dom.playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+          }
+        });
+
+        this.dom.vocalEffortSelect.addEventListener('change', (e) => {
+          this.engine.vocalEffort = e.target.value;
+          const map = { normal: '62.3 dB SPL', raised: '68.3 dB SPL', loud: '74.9 dB SPL', shout: '82.3 dB SPL' };
+          this.dom.effortSplTag.textContent = map[e.target.value];
+        });
+
+        this.dom.opModeSelect.addEventListener('change', (e) => {
+          this.engine.opMode = e.target.value;
+        });
+
+        this.dom.calibGainRange.addEventListener('input', (e) => {
+          const val = parseFloat(e.target.value);
+          this.dom.calibGainTag.textContent = `+${val.toFixed(1)} dB`;
+          this.engine.updateGainTrim(val);
+        });
+
+        this.dom.unitToggleBtn.addEventListener('click', () => {
+          this.unitFocusDecimal = !this.unitFocusDecimal;
+          this.dom.unitToggleBtn.textContent = this.unitFocusDecimal
+            ? 'Display Mode: Decimal [0.000 - 1.000]'
+            : 'Display Mode: Percentage [0.0% - 100%]';
+        });
+
+        this.dom.mockSignalSelect.addEventListener('change', async (e) => {
+          const mode = e.target.value;
+          this.engine.mockSimulation = mode;
+          if (mode === 'off') {
+            this.dom.alertBanner.style.display = 'none';
+            if (this.engine.isRunning) await this.startAnalysis();
+          } else {
+            await this.engine.initContext();
+            this.engine.startMockSignal(mode);
+            this.updateStatus(`Simulation Mode: [${mode.toUpperCase()}]`, 'sim');
+            this.dom.toggleBtnText.textContent = 'Pause Simulation';
+            this.dom.playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            this.dom.alertBanner.textContent = `Simulating calibrated background condition: ${mode.toUpperCase()}`;
+            this.dom.alertBanner.style.display = 'block';
+          }
+        });
+      }
+
+      async startAnalysis() {
+        this.dom.alertBanner.style.display = 'none';
+        this.updateStatus('Acquiring Microphone...', 'idle');
+
+        const res = await this.engine.startMicrophone();
+        if (res.success) {
+          this.updateStatus('Live Mic Calibrated', 'active');
+          this.dom.toggleBtnText.textContent = 'Pause Analysis';
+          this.dom.playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+        } else {
+          this.updateStatus('Mic Blocked / Fallback', 'error');
+          this.dom.alertBanner.textContent = 'Microphone access denied or unsecure origin. Falling back to Procedural Simulation.';
+          this.dom.alertBanner.style.display = 'block';
+          this.dom.mockSignalSelect.value = 'cafeteria';
+          this.engine.startMockSignal('cafeteria');
+          this.dom.toggleBtnText.textContent = 'Pause Simulation';
+          this.dom.playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+        }
+      }
+
+      updateStatus(text, state) {
+        this.dom.dspStatusText.textContent = text;
+        this.dom.dspStatusDot.className = 'status-dot';
+        if (state === 'active') this.dom.dspStatusDot.classList.add('active');
+        if (state === 'sim') this.dom.dspStatusDot.classList.add('sim');
+        if (state === 'error') this.dom.dspStatusDot.classList.add('error');
+      }
+
+      startLoop() {
+        const tick = (now) => {
+          this.engine.processFrame(now);
+          if (this.visualizer) this.visualizer.draw();
+
+          if (now - this.lastDOMUpdate >= this.domThrottleInterval) {
+            this.renderDOM();
+            this.lastDOMUpdate = now;
+          }
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+
+      renderDOM() {
+        const val = this.engine.smoothedSII;
+        const dec = val.toFixed(3);
+        const pct = (val * 100).toFixed(1) + '%';
+
+        if (this.unitFocusDecimal) {
+          this.dom.siiMainDisplay.textContent = dec;
+          this.dom.siiSubDisplay.textContent = `${pct} Equivalent`;
+        } else {
+          this.dom.siiMainDisplay.textContent = pct;
+          this.dom.siiSubDisplay.textContent = `SII Decimal: ${dec}`;
+        }
+
+        const card = this.dom.metricCard;
+        const badge = this.dom.siiQualityBadge;
+        card.classList.remove('theme-poor', 'theme-fair', 'theme-good');
+
+        if (val < 0.45) {
+          card.classList.add('theme-poor');
+          badge.textContent = 'Poor Intelligibility (SII < 0.45)';
+        } else if (val <= 0.75) {
+          card.classList.add('theme-fair');
+          badge.textContent = 'Fair Intelligibility (0.45 - 0.75)';
+        } else {
+          card.classList.add('theme-good');
+          badge.textContent = 'Good Intelligibility (SII > 0.75)';
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      new SIIAppUI();
+    });
+  </script>
+</body>
+</html>

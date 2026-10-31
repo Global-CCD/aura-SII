@@ -1,0 +1,13 @@
+{
+  "name": "sii-analyzer-pro",
+  "version": "2.0.0",
+  "description": "Production ANSI S3.5-1997 & ISO 16832 Speech Intelligibility Index Real-Time Web Audio Suite",
+  "main": "public/index.html",
+  "scripts": {
+    "test": "node test/verify-ansi-s35.js",
+    "serve": "npx serve public"
+  },
+  "keywords": ["audio-engineering", "dsp", "ansi-s3-5", "iso-16832", "web-audio-api", "speech-intelligibility"],
+  "author": "Principal Audio Engineer & Senior Web Architect",
+  "license": "MIT"
+}
