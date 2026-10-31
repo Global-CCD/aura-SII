@@ -1,7 +1,7 @@
 /**
  * ANSI S3.5-1997 Annex A Reference Validation Suite
- * SemVer: v2.2.0
- * Verified against ANSI S3.5-1997 Section 4.3.2 Equations (5) through (9).
+ * SemVer: v2.3.0
+ * Verified against ANSI S3.5-1997 Section 4.3.2 Equations (5) through (10).
  */
 const ANSI_TABLE_3 = {
   bands: [160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000],
@@ -11,6 +11,7 @@ const ANSI_TABLE_3 = {
     0.0820, 0.0808, 0.0483, 0.0453, 0.0274, 0.0145
   ],
   speechNormal: [32.41, 34.48, 34.75, 33.98, 34.59, 34.27, 32.06, 28.30, 25.01, 23.00, 20.15, 17.32, 13.18, 11.55, 9.33, 5.31, 2.59, 1.13],
+  speechShout:  [30.77, 36.65, 42.50, 46.51, 47.40, 49.24, 51.21, 51.44, 51.31, 49.63, 47.65, 44.32, 40.80, 38.13, 34.41, 28.24, 23.45, 20.72],
   internalNoise: [0.6, -1.7, -3.9, -6.1, -8.2, -9.7, -10.8, -11.9, -12.5, -13.5, -15.4, -17.7, -21.2, -24.2, -25.9, -23.6, -15.8, -7.1]
 };
 
@@ -19,7 +20,7 @@ function calculateANSI_SII(speechSpectrum, noiseSpectrum, applyUpwardMasking = t
   const numBands = bands.length;
   const sixthOctave = Math.pow(2, 1 / 6);
 
-  // 1. Calculate self-speech masking: V_i = E_i - 24 dB (ANSI S3.5 §4.3.2.1, Eq. 5)
+  // 1. Self-speech masking: V_i = E_i - 24 dB (ANSI S3.5 §4.3.2.1, Eq. 5)
   //    and slope parameter C_i (ANSI S3.5 §4.3.2.3, Eq. 7)
   const V = new Float64Array(numBands);
   const B = new Float64Array(numBands);
@@ -27,28 +28,24 @@ function calculateANSI_SII(speechSpectrum, noiseSpectrum, applyUpwardMasking = t
 
   for (let i = 0; i < numBands; i++) {
     V[i] = speechSpectrum[i] - 24.0;
-    // B_i is the larger of noise and self-speech masking (ANSI S3.5 §4.3.2.2)
     B[i] = Math.max(V[i], noiseSpectrum[i]);
-
-    // Bandwidth of 1/3-octave band: delta_f = f_c * (2^(1/6) - 2^(-1/6))
     const deltaF = bands[i] * (sixthOctave - 1 / sixthOctave);
-    // C_i = -80 + 0.6 * [B_i + 10 * log10(deltaF)] (dB/octave)
     C[i] = -80.0 + 0.6 * (B[i] + 10.0 * Math.log10(deltaF));
   }
 
-  // 2. Calculate equivalent masking spectrum Z_i (ANSI S3.5 §4.3.2.4 & §4.3.2.5, Eq. 9)
+  // 2. Equivalent masking spectrum Z_i (ANSI S3.5 §4.3.2.4 & §4.3.2.5, Eq. 9)
   const Z = new Float64Array(numBands);
   const disturbance = new Float64Array(numBands);
 
   Z[0] = B[0];
-  disturbance[0] = Math.max(Z[0], ANSI_TABLE_3.internalNoise[0]);
+  disturbance[0] = Math.max(Z[0], V[0], ANSI_TABLE_3.internalNoise[0]);
 
   for (let i = 1; i < numBands; i++) {
     let sumUpwardPower = 0.0;
     if (applyUpwardMasking) {
       for (let k = 0; k < i; k++) {
-        const h_k = bands[k] * sixthOctave; // Upper band edge of band k
-        const F_i = bands[i];              // Center frequency of band i
+        const h_k = bands[k] * sixthOctave;
+        const F_i = bands[i];
         if (F_i > h_k) {
           const octaves = 3.32 * Math.log10(F_i / h_k);
           const maskingFromK = B[k] + C[k] * octaves;
@@ -58,7 +55,8 @@ function calculateANSI_SII(speechSpectrum, noiseSpectrum, applyUpwardMasking = t
     }
     const noisePower = Math.pow(10.0, 0.1 * noiseSpectrum[i]);
     Z[i] = 10.0 * Math.log10(noisePower + sumUpwardPower);
-    disturbance[i] = Math.max(Z[i], ANSI_TABLE_3.internalNoise[i]);
+    // Standard compliance (§4.3.3): Disturbance includes within-band masking V[i]
+    disturbance[i] = Math.max(Z[i], V[i], ANSI_TABLE_3.internalNoise[i]);
   }
 
   // 3. Band Audibility & SII Accumulation
@@ -85,7 +83,7 @@ function calculateANSI_SII(speechSpectrum, noiseSpectrum, applyUpwardMasking = t
 }
 
 console.log("=================================================");
-console.log("  ANSI S3.5-1997 Reference Test Suite (v2.2.0)   ");
+console.log("  ANSI S3.5-1997 Reference Test Suite (v2.3.0)   ");
 console.log("=================================================");
 
 let failed = false;
@@ -124,6 +122,16 @@ if (siiWithUpward >= siiWithoutUpward) {
   failed = true;
 } else {
   console.log("PASS: Upward masking correctly attenuates intelligibility.");
+}
+
+// TEST 4: High Vocal Effort Distortion Factor (Shouted Speech in Quiet)
+const siiShout = calculateANSI_SII(ANSI_TABLE_3.speechShout, quietNoise, true);
+console.log(`Test 4 [Shouted Speech Distortion]: Result: ${siiShout.toFixed(3)}`);
+if (siiShout >= 0.99) {
+  console.error("FAIL: Level distortion factor L_i failed to penalize shouted speech!");
+  failed = true;
+} else {
+  console.log("PASS: Level distortion factor correctly models high-level auditory degradation.");
 }
 
 if (failed) {
