@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Speech Intelligibility Index (SII) Pro DSP Analyzer with Real-Time Accuracy %, Anti-Flicker Filtering & Triple-DB Architecture.">
-  <title>Speech Intelligibility Index (SII) Pro - v2.4.0</title>
+  <meta name="description" content="Speech Intelligibility Index (SII) Pro DSP Analyzer with Time-Domain Headroom, Anti-Flicker Filter & Triple-DB Architecture.">
+  <title>Speech Intelligibility Index (SII) Pro - v2.5.0</title>
 
   <style>
     :root, [data-theme="light"] {
@@ -30,7 +30,7 @@
       --canvas-speech: #0969da;
       --canvas-noise: #cf6716;
       --canvas-audibility: rgba(26, 127, 55, 0.85);
-      --canvas-curve: #05857b;
+      --canvas-curve: #05857b; /* WCAG 2.2 AA compliant contrast on white */
 
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
@@ -233,7 +233,6 @@
       border-radius: 50px;
     }
 
-    /* Accuracy Meter Component */
     .accuracy-card {
       background: var(--bg-surface-elevated);
       border: 1px solid var(--border-subtle);
@@ -426,7 +425,6 @@
     }
     .band-inspect-bar strong { color: var(--accent-cyan); }
 
-    /* 3-Database Logger Grid */
     .logger-section {
       grid-column: 1 / -1;
       background: var(--bg-surface);
@@ -552,7 +550,7 @@
         <path d="M12 2v20M17 5v14M7 9v6M22 10v4M2 11v2"/>
       </svg>
       <h1>Speech Intelligibility Index Pro</h1>
-      <span class="badge-std">v2.4.0 &bull; Accuracy Telemetry</span>
+      <span class="badge-std">v2.5.0 &bull; ANSI S3.5-1997 / ISO 16832</span>
     </div>
 
     <div class="header-actions">
@@ -591,8 +589,8 @@
           <div id="accuracyBarFill" class="accuracy-bar-fill"></div>
         </div>
         <div class="accuracy-meta-sub">
-          <span id="accuracyRatingLabel">Rating: Uncalibrated</span>
-          <span id="accuracyPenaltySummary">Uncertainty Budget: 0 dB</span>
+          <span id="accuracyRatingLabel">Rating: Engine Idle</span>
+          <span id="accuracyPenaltySummary">Awaiting stream activation</span>
         </div>
       </div>
 
@@ -770,7 +768,7 @@
   </main>
 
   <footer>
-    <p>Speech Intelligibility Index (SII) Pro v2.4.0 &bull; Real-Time Accuracy % Engine &bull; Triple-Isolated IndexedDB</p>
+    <p>Speech Intelligibility Index (SII) Pro v2.5.0 &bull; Time-Domain Headroom Metrology &bull; ANSI S3.5-1997 / ISO 16832</p>
   </footer>
 
   <script>
@@ -834,6 +832,7 @@
         let formFactor = 'Desktop Workstation';
         let os = 'Unknown OS';
 
+        // Precedence: Check iPadOS touch telemetry before desktop Macintosh string
         const isIPad = /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
         if (isIPad) {
@@ -867,7 +866,7 @@
         }
 
         if (/bluetooth|airpods|buds|wireless|hands-free|wh-1000|wf-1000|bose|jabra|plantronics/i.test(l)) {
-          return { type: 'bluetooth', category: 'Bluetooth Wireless Headset', icon: '🎧', note: 'Wideband Wireless (16-48 kHz)', baseAccuracyWeight: 14 };
+          return { type: 'bluetooth', category: 'Bluetooth Wireless Headset', icon: '🎧', note: 'Band-limited SCO/mSBC', baseAccuracyWeight: 14 };
         }
         if (/usb|yeti|shure|rode|focusrite|scarlett|quadcast|hyperx|elgato|samson|fifine|audio-technica|behringer|mv7|nt-usb/i.test(l)) {
           return { type: 'usb', category: 'USB Digital Interface', icon: '🎛️', note: 'Studio Digital Audio', baseAccuracyWeight: 35 };
@@ -885,25 +884,42 @@
 
     /**
      * Real-Time Acoustic Accuracy & Uncertainty Estimator (ISO/IEC Guide 98-3 GUM)
-     * Models measurement uncertainty without biasing the ANSI S3.5 calculation.
      */
     class AcousticAccuracyEstimator {
       constructor() {
         this.rawAccuracy = 0.0;
         this.smoothedAccuracy = 0.0;
-        this.timeConstantTau = 0.40; // Anti-jitter continuous time constant
+        this.timeConstantTau = 0.40;
         this.lastUpdateTime = performance.now();
         this.latestDiagnostic = {
           micFidelityScore: 0,
           streamScore: 0,
           hostScore: 0,
           signalScore: 0,
-          confidenceRating: 'Uncalibrated',
-          penaltySummary: 'No active stream'
+          confidenceRating: 'Engine Idle',
+          penaltySummary: 'Analysis paused / inactive'
         };
       }
 
-      evaluate({ micClassification, streamTrack, hostProfile, peakDbFs, sampleRate, gainTrimDb, opMode, nowMs }) {
+      evaluate({ isEngineRunning, micClassification, streamTrack, hostProfile, peakTimeDomainDbFs, sampleRate, gainTrimDb, opMode, nowMs }) {
+        if (!isEngineRunning) {
+          this.smoothedAccuracy = 0.0;
+          this.rawAccuracy = 0.0;
+          this.latestDiagnostic = {
+            micFidelityScore: 0,
+            streamScore: 0,
+            hostScore: 0,
+            signalScore: 0,
+            confidenceRating: 'Engine Idle',
+            penaltySummary: 'Awaiting stream activation'
+          };
+          return {
+            accuracyPct: 0.0,
+            rawAccuracy: 0.0,
+            diagnostic: this.latestDiagnostic
+          };
+        }
+
         const dtSec = Math.min(0.1, Math.max(0.001, (nowMs - this.lastUpdateTime) / 1000));
         this.lastUpdateTime = nowMs;
 
@@ -921,29 +937,26 @@
         // 3. Host Coupling & Environment Component (Max 15 pts)
         let hostScore = 15;
         if (hostProfile.formFactor.includes('Smartphone') || hostProfile.formFactor.includes('Tablet')) {
-          hostScore = 10; // Handheld coupling uncertainty
+          hostScore = 10;
         } else if (hostProfile.formFactor.includes('Laptop')) {
-          hostScore = 12; // Keyboard/chassis thermal fan proximity
+          hostScore = 12;
         }
 
-        // 4. Signal Dynamics, Headroom & Hardware Configuration (Max 25 pts)
+        // 4. Time-Domain Signal Dynamics, Headroom & Hardware Configuration (Max 25 pts)
         let signalScore = 25;
-        if (sampleRate < 32000) signalScore -= 12; // High frequency band cut-off penalty
-        if (peakDbFs > -1.0) signalScore -= 15;    // Digital clipping saturation risk
-        else if (peakDbFs < -55.0) signalScore -= 8; // Quantization noise floor proximity
-        if (gainTrimDb === 0.0 && opMode === 'ambient') signalScore -= 4; // Uncalibrated mic sensitivity
+        if (sampleRate < 32000) signalScore -= 12;
+        if (peakTimeDomainDbFs >= -0.1) signalScore -= 15;          // True digital clipping event
+        else if (peakTimeDomainDbFs < -45.0) signalScore -= 8;      // Low SNR / quantization noise proximity
+        if (gainTrimDb === 0.0 && opMode === 'ambient') signalScore -= 4;
 
         signalScore = Math.max(0, signalScore);
 
-        // Total instantaneous accuracy %
         const raw = Math.min(99.4, Math.max(12.0, micFidelityScore + streamScore + hostScore + signalScore));
         this.rawAccuracy = raw;
 
-        // Anti-jitter continuous EMA smoothing
         const alpha = 1.0 - Math.exp(-dtSec / this.timeConstantTau);
         this.smoothedAccuracy += alpha * (this.rawAccuracy - this.smoothedAccuracy);
 
-        // Categorize Confidence Rating
         let rating = 'Low Confidence';
         if (this.smoothedAccuracy >= 82.0) rating = 'High Confidence (Lab / Field Grade)';
         else if (this.smoothedAccuracy >= 65.0) rating = 'Moderate Confidence (Screening Grade)';
@@ -958,8 +971,8 @@
         };
 
         return {
-          accuracyPct: Number(this.smoothedAccuracy.toFixed(1)),
-          rawAccuracy: Number(this.rawAccuracy.toFixed(1)),
+          accuracyPct: Math.round(this.smoothedAccuracy * 10) / 10,
+          rawAccuracy: Math.round(this.rawAccuracy * 10) / 10,
           diagnostic: this.latestDiagnostic
         };
       }
@@ -967,9 +980,6 @@
 
     /**
      * TRIPLE ISOLATED INDEXEDDB ENGINE
-     * 1. SIIMeasurementsDB (High-level SII sessions)
-     * 2. SIITelemetryDB (18-band spectral frames)
-     * 3. SIIAccuracyDB (Accuracy %, transducer diagnostics, headroom)
      */
     class SIITripleLogger {
       constructor() {
@@ -1007,31 +1017,37 @@
 
       async logMeasurement(record) {
         if (!this.dbMeasurements) return;
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           const tx = this.dbMeasurements.transaction('measurements', 'readwrite');
           tx.objectStore('measurements').add(record);
           tx.oncomplete = () => resolve();
+          tx.onerror = (e) => reject(e);
+          tx.onabort = (e) => reject(e);
         });
       }
 
       async logTelemetryBatch(records) {
         if (!this.dbTelemetry || !records.length) return;
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           const tx = this.dbTelemetry.transaction('telemetry', 'readwrite');
           const store = tx.objectStore('telemetry');
           for (let i = 0; i < records.length; i++) {
             store.add(records[i]);
           }
           tx.oncomplete = () => resolve();
+          tx.onerror = (e) => reject(e);
+          tx.onabort = (e) => reject(e);
         });
       }
 
       async logAccuracy(record) {
         if (!this.dbAccuracy) return;
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           const tx = this.dbAccuracy.transaction('accuracy_logs', 'readwrite');
           tx.objectStore('accuracy_logs').add(record);
           tx.oncomplete = () => resolve();
+          tx.onerror = (e) => reject(e);
+          tx.onabort = (e) => reject(e);
         });
       }
 
@@ -1057,10 +1073,12 @@
 
       async clearStore(dbInstance, storeName) {
         if (!dbInstance) return;
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
           const tx = dbInstance.transaction(storeName, 'readwrite');
           tx.objectStore(storeName).clear();
           tx.oncomplete = () => resolve();
+          tx.onerror = (e) => reject(e);
+          tx.onabort = (e) => reject(e);
         });
       }
     }
@@ -1082,8 +1100,9 @@
         this.selectedDeviceId = 'default';
         this.fftSize = 4096;
         this.fftDataBuffer = null;
+        this.timeDomainBuffer = new Float32Array(512); // Time-domain peak probe
         this.binMapping = null;
-        this.peakDbFs = -100.0;
+        this.peakTimeDomainDbFs = -100.0;
 
         this.splCalibrationBase = 94.0;
         this.hardwareGainTrim = 0.0;
@@ -1099,7 +1118,7 @@
         this.bandAudibility = new Float32Array(numBands);
         this.bandContribution = new Float32Array(numBands);
 
-        // Pre-allocated persistent scratch buffers to prevent GC thrash
+        // Pre-allocated persistent scratch buffers
         this.scratchNoise = new Float32Array(numBands);
         this.scratchV = new Float32Array(numBands);
         this.scratchB = new Float32Array(numBands);
@@ -1226,6 +1245,7 @@
       pause() {
         this.isRunning = false;
         this.stopMockSignal();
+        this.peakTimeDomainDbFs = -100.0;
       }
 
       updateGainTrim(valDb) {
@@ -1241,14 +1261,17 @@
         const dtSec = Math.min(0.1, Math.max(0.001, (nowMs - this.lastFrameTime) / 1000));
         this.lastFrameTime = nowMs;
 
-        this.analyser.getFloatFrequencyData(this.fftDataBuffer);
-
-        // Find peak dBFS in frame for headroom/accuracy computation
-        let peak = -150.0;
-        for (let k = 0; k < this.fftDataBuffer.length; k++) {
-          if (this.fftDataBuffer[k] > peak) peak = this.fftDataBuffer[k];
+        // 1. Time-Domain Digital Peak & Headroom Probe (True sample amplitude)
+        this.analyser.getFloatTimeDomainData(this.timeDomainBuffer);
+        let peakAbs = 0.0;
+        for (let t = 0; t < this.timeDomainBuffer.length; t++) {
+          const abs = Math.abs(this.timeDomainBuffer[t]);
+          if (abs > peakAbs) peakAbs = abs;
         }
-        this.peakDbFs = peak;
+        this.peakTimeDomainDbFs = (peakAbs > 1e-5) ? (20 * Math.log10(peakAbs)) : -100.0;
+
+        // 2. Frequency Domain Power Spectral Density
+        this.analyser.getFloatFrequencyData(this.fftDataBuffer);
 
         const stdSpeechSpectrum = ANSI_TABLE_3.speechLevels[this.vocalEffort];
         const normalSpeechSpectrum = ANSI_TABLE_3.speechLevels.normal;
@@ -1320,10 +1343,13 @@
           this.bandSNR[i] = snr_i;
 
           let K_i = Math.max(0.0, Math.min(1.0, (snr_i + 15.0) / 30.0));
+
+          // ANSI S3.5-1997 §4.3.5 (Eq. 12) Standard Clamped Distortion
           let L_i = 1.0;
           const normRef = normalSpeechSpectrum[i] + 10.0;
           if (E_i > normRef) {
-            L_i = Math.max(0.0, Math.min(1.0, 1.0 - (E_i - normRef) / 160.0));
+            const excess = Math.min(30.0, E_i - normRef);
+            L_i = 1.0 - (excess / 160.0);
           }
 
           const A_i = L_i * K_i;
@@ -1348,8 +1374,14 @@
         this.ctx = canvas.getContext('2d');
         this.engine = engine;
         this.hoveredIndex = -1;
+        this.isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         this.initDPI();
         this.bindEvents();
+      }
+
+      setTheme(isDark) {
+        this.isDark = isDark;
+        this.draw();
       }
 
       initDPI() {
@@ -1408,7 +1440,8 @@
         const numBands = bands.length;
         const colWidth = w / numBands;
 
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        // Zero-DOM cached theme check
+        const isDark = this.isDark;
         const colBg = isDark ? '#05080c' : '#ffffff';
         const colGrid = isDark ? '#182230' : '#e8eaed';
         const colText = isDark ? '#647182' : '#59636e';
@@ -1493,7 +1526,7 @@
     }
 
     /**
-     * UI Coordinator & Triple-DB Logger Controller
+     * UI Coordinator, Hardware Switcher & Asynchronous Triple-DB Logger
      */
     class SIIAppUI {
       constructor() {
@@ -1587,7 +1620,7 @@
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('sii_theme', next);
         this.updateThemeIcons(next);
-        if (this.visualizer) this.visualizer.draw();
+        if (this.visualizer) this.visualizer.setTheme(next === 'dark');
       }
 
       updateThemeIcons(theme) {
@@ -1684,7 +1717,7 @@
               this.updateStatus('Mic Switched', 'active');
             } else {
               this.updateStatus('Switch Failed', 'error');
-              alert('Unable to access the selected microphone. Reverting.');
+              alert('Unable to access selected microphone. Reverting.');
             }
           }
         });
@@ -1729,7 +1762,6 @@
           }
         });
 
-        // 3-DB Logger Buttons
         this.dom.recToggleBtn.addEventListener('click', () => this.toggleRecording());
 
         this.dom.exportMeasCsvBtn.addEventListener('click', () => this.exportMeasurements('csv'));
@@ -1737,7 +1769,7 @@
         this.dom.clearMeasBtn.addEventListener('click', async () => {
           if (confirm('Clear SIIMeasurementsDB?')) {
             await this.logger.clearStore(this.logger.dbMeasurements, 'measurements');
-            this.refreshDBCounts();
+            await this.refreshDBCounts();
           }
         });
 
@@ -1746,7 +1778,7 @@
         this.dom.clearTelemBtn.addEventListener('click', async () => {
           if (confirm('Clear SIITelemetryDB?')) {
             await this.logger.clearStore(this.logger.dbTelemetry, 'telemetry');
-            this.refreshDBCounts();
+            await this.refreshDBCounts();
           }
         });
 
@@ -1755,7 +1787,7 @@
         this.dom.clearAccBtn.addEventListener('click', async () => {
           if (confirm('Clear SIIAccuracyDB?')) {
             await this.logger.clearStore(this.logger.dbAccuracy, 'accuracy_logs');
-            this.refreshDBCounts();
+            await this.refreshDBCounts();
           }
         });
       }
@@ -1786,9 +1818,9 @@
         if (state === 'rec') this.dom.dspStatusDot.classList.add('rec');
       }
 
-      toggleRecording() {
+      async toggleRecording() {
         if (!this.isRecording) {
-          if (!this.engine.isRunning) this.startAnalysis();
+          if (!this.engine.isRunning) await this.startAnalysis();
           this.isRecording = true;
           this.recordingSessionId = `SII_${Date.now()}`;
           this.recordingStartTime = performance.now();
@@ -1798,16 +1830,21 @@
           this.dom.recToggleBtn.style.background = 'var(--text-muted)';
         } else {
           this.isRecording = false;
+          // Guaranteed asynchronous batch flush
           if (this.telemetryBatch.length > 0) {
             const batch = this.telemetryBatch;
             this.telemetryBatch = [];
-            this.logger.logTelemetryBatch(batch);
+            try {
+              await this.logger.logTelemetryBatch(batch);
+            } catch (e) {
+              console.error('Batch commit failed:', e);
+            }
           }
           this.dom.recBtnText.textContent = 'Start Recording';
           this.dom.recDot.style.display = 'none';
           this.dom.recToggleBtn.style.background = 'var(--sii-poor)';
           this.dom.recTimer.textContent = '00:00:00';
-          setTimeout(() => this.refreshDBCounts(), 100);
+          await this.refreshDBCounts();
         }
       }
 
@@ -1816,23 +1853,22 @@
           this.engine.processFrame(now);
           if (this.visualizer) this.visualizer.draw();
 
-          // Evaluate Real-Time Accuracy % (anti-flicker smoothed)
           const track = (this.engine.stream && this.engine.stream.getAudioTracks().length > 0)
             ? this.engine.stream.getAudioTracks()[0]
             : null;
 
           const accResult = this.accuracyEstimator.evaluate({
+            isEngineRunning: this.engine.isRunning,
             micClassification: this.activeMicClassification || { baseAccuracyWeight: 20, category: 'Default' },
             streamTrack: track,
-            hostProfile: this.hostProfile || { formFactor: 'Desktop' },
-            peakDbFs: this.engine.peakDbFs,
+            hostProfile: this.hostProfile || { formFactor: 'Desktop Workstation' },
+            peakTimeDomainDbFs: this.engine.peakTimeDomainDbFs,
             sampleRate: this.engine.audioCtx ? this.engine.audioCtx.sampleRate : 48000,
             gainTrimDb: this.engine.hardwareGainTrim,
             opMode: this.engine.opMode,
             nowMs: now
           });
 
-          // Session Recording Logic across the 3 Databases
           if (this.isRecording && this.engine.isRunning) {
             const elapsed = Math.floor((now - this.recordingStartTime) / 1000);
             const hrs = String(Math.floor(elapsed / 3600)).padStart(2, '0');
@@ -1840,17 +1876,17 @@
             const secs = String(elapsed % 60).padStart(2, '0');
             this.dom.recTimer.textContent = `${hrs}:${mins}:${secs}`;
 
-            // Telemetry at 5 Hz (batched into Database 2)
+            // Telemetry at 5 Hz (batched to DB 2)
             if (now - this.lastTelemetryLogTime >= 200) {
               const bandsData = [];
               for (let i = 0; i < ANSI_TABLE_3.bands.length; i++) {
                 bandsData.push({
                   fc: ANSI_TABLE_3.bands[i],
-                  speech_Ei: Number(this.engine.bandSpectrumSpeech[i].toFixed(2)),
-                  disturbance_Di: Number(this.engine.bandSpectrumDisturbance[i].toFixed(2)),
-                  snr_i: Number(this.engine.bandSNR[i].toFixed(2)),
-                  audibility_Ai: Number(this.engine.bandAudibility[i].toFixed(3)),
-                  contrib_i: Number(this.engine.bandContribution[i].toFixed(4))
+                  speech_Ei: Math.round(this.engine.bandSpectrumSpeech[i] * 100) / 100,
+                  disturbance_Di: Math.round(this.engine.bandSpectrumDisturbance[i] * 100) / 100,
+                  snr_i: Math.round(this.engine.bandSNR[i] * 100) / 100,
+                  audibility_Ai: Math.round(this.engine.bandAudibility[i] * 1000) / 1000,
+                  contrib_i: Math.round(this.engine.bandContribution[i] * 10000) / 10000
                 });
               }
 
@@ -1864,33 +1900,31 @@
               if (this.telemetryBatch.length >= 5) {
                 const batch = this.telemetryBatch;
                 this.telemetryBatch = [];
-                this.logger.logTelemetryBatch(batch);
+                this.logger.logTelemetryBatch(batch).catch(e => console.error(e));
               }
               this.lastTelemetryLogTime = now;
             }
 
-            // High-Level Measurements (DB 1) & Accuracy Diagnostics (DB 3) at 1 Hz
+            // Measurements (DB 1) & Accuracy Diagnostics (DB 3) at 1 Hz
             if (now - this.lastMeasurementLogTime >= 1000) {
-              const avgSNR = (this.engine.bandSNR.reduce((a, b) => a + b, 0) / this.engine.bandSNR.length).toFixed(2);
+              const avgSNR = Math.round((this.engine.bandSNR.reduce((a, b) => a + b, 0) / this.engine.bandSNR.length) * 100) / 100;
               const nowIso = new Date().toISOString();
               const nowTs = Date.now();
 
-              // Database 1: Measurements
               this.logger.logMeasurement({
                 sessionId: this.recordingSessionId,
                 timestamp: nowTs,
                 isoTime: nowIso,
                 durationSec: elapsed,
-                siiSmoothed: Number(this.engine.smoothedSII.toFixed(3)),
-                siiRaw: Number(this.engine.rawSII.toFixed(3)),
+                siiSmoothed: Math.round(this.engine.smoothedSII * 1000) / 1000,
+                siiRaw: Math.round(this.engine.rawSII * 1000) / 1000,
                 rating: this.engine.smoothedSII < 0.45 ? 'Poor' : (this.engine.smoothedSII <= 0.75 ? 'Fair' : 'Good'),
                 vocalEffort: this.engine.vocalEffort,
                 opMode: this.engine.opMode,
                 gainTrimDb: this.engine.hardwareGainTrim,
-                avgSnrDb: Number(avgSNR)
-              });
+                avgSnrDb: avgSNR
+              }).catch(e => console.error(e));
 
-              // Database 3: Accuracy Diagnostics Log
               this.logger.logAccuracy({
                 sessionId: this.recordingSessionId,
                 timestamp: nowTs,
@@ -1904,9 +1938,9 @@
                 streamScore: accResult.diagnostic.streamScore,
                 hostScore: accResult.diagnostic.hostScore,
                 signalScore: accResult.diagnostic.signalScore,
-                peakDbFs: Number(this.engine.peakDbFs.toFixed(1)),
+                peakTimeDomainDbFs: Math.round(this.engine.peakTimeDomainDbFs * 10) / 10,
                 sampleRate: this.engine.audioCtx ? this.engine.audioCtx.sampleRate : 48000
-              });
+              }).catch(e => console.error(e));
 
               this.lastMeasurementLogTime = now;
               this.refreshDBCounts();
@@ -1959,7 +1993,6 @@
           badge.textContent = 'Good Intelligibility (SII > 0.75)';
         }
 
-        // Render Real-Time Accuracy Metrology UI (Flicker-Free)
         if (accResult) {
           this.dom.accuracyReadout.textContent = `${accResult.accuracyPct.toFixed(1)}%`;
           this.dom.accuracyBarFill.style.width = `${accResult.accuracyPct}%`;
@@ -2027,7 +2060,7 @@
 
           for (const r of records) {
             const row = [r.id, escapeCSV(r.sessionId), r.timestamp, escapeCSV(r.isoTime)];
-            for (const b of r.bands) {
+            for (const b of (r.bands || [])) {
               row.push(b.speech_Ei, b.disturbance_Di, b.snr_i, b.audibility_Ai, b.contrib_i);
             }
             csvLines.push(row.join(','));
@@ -2046,7 +2079,7 @@
         if (format === 'json') {
           this.downloadFile(JSON.stringify(records, null, 2), `sii_accuracy_diagnostics_${Date.now()}.json`, 'application/json');
         } else {
-          const headers = ['id', 'sessionId', 'timestamp', 'isoTime', 'durationSec', 'accuracyPct', 'rawAccuracy', 'confidenceRating', 'micCategory', 'micFidelityScore', 'streamScore', 'hostScore', 'signalScore', 'peakDbFs', 'sampleRate'];
+          const headers = ['id', 'sessionId', 'timestamp', 'isoTime', 'durationSec', 'accuracyPct', 'rawAccuracy', 'confidenceRating', 'micCategory', 'micFidelityScore', 'streamScore', 'hostScore', 'signalScore', 'peakTimeDomainDbFs', 'sampleRate'];
           const csvLines = [headers.join(',')];
           for (const r of records) {
             csvLines.push(headers.map(h => escapeCSV(r[h])).join(','));

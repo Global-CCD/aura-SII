@@ -1,7 +1,7 @@
 {
   "name": "sii-analyzer-pro",
-  "version": "2.4.0",
-  "description": "ANSI S3.5-1997 & ISO 16832 Zero-Allocation DSP Suite with Real-Time Accuracy % & Triple-DB Architecture",
+  "version": "2.5.0",
+  "description": "ANSI S3.5-1997 & ISO 16832 Metrology Suite with Time-Domain Headroom & Triple IndexedDB Logger",
   "main": "public/index.html",
   "scripts": {
     "test": "node test/verify-ansi-s35.js",

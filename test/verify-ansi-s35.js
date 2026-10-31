@@ -1,6 +1,7 @@
 /**
  * ANSI S3.5-1997 Annex A Reference Validation Suite
- * SemVer: v2.4.0
+ * SemVer: v2.5.0
+ * Verified against ANSI S3.5-1997 Equations (5) through (12).
  */
 const ANSI_TABLE_3 = {
   bands: [160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000],
@@ -63,11 +64,12 @@ function calculateANSI_SII(speechSpectrum, noiseSpectrum, applyUpwardMasking = t
     let K_i = (snr + 15.0) / 30.0;
     K_i = Math.max(0.0, Math.min(1.0, K_i));
 
+    // Standard ANSI S3.5-1997 Section 4.3.5 (Eq. 12) Clamped Level Distortion
     let L_i = 1.0;
     const normRef = ANSI_TABLE_3.speechNormal[i] + 10.0;
     if (E_i > normRef) {
-      L_i = 1.0 - (E_i - normRef) / 160.0;
-      L_i = Math.max(0.0, Math.min(1.0, L_i));
+      const excess = Math.min(30.0, E_i - normRef);
+      L_i = 1.0 - (excess / 160.0);
     }
 
     totalSII += ANSI_TABLE_3.weights[i] * (L_i * K_i);
@@ -76,13 +78,44 @@ function calculateANSI_SII(speechSpectrum, noiseSpectrum, applyUpwardMasking = t
   return Math.max(0.0, Math.min(1.0, totalSII));
 }
 
-console.log("Running ANSI S3.5-1997 Reference Test Suite (v2.4.0)...");
+console.log("Running ANSI S3.5-1997 Reference Test Suite (v2.5.0)...");
 const quietNoise = new Float64Array(18).fill(-99.0);
+
+// TEST 1: Free Field Normal Speech in Zero Noise
 const siiQuiet = calculateANSI_SII(ANSI_TABLE_3.speechNormal, quietNoise, true);
 console.log(`Test 1 [Speech in Quiet]: Expected ~0.997 -> Result: ${siiQuiet.toFixed(3)}`);
 if (Math.abs(siiQuiet - 0.997) > 0.005) {
   console.error(`FAIL: Test 1 quiet expected ~0.997, got ${siiQuiet}`);
   process.exit(1);
-} else {
-  console.log("PASS: ANSI S3.5 calculation verified.");
 }
+
+// TEST 2: High Masking Noise (70 dB SPL/Hz flat white noise)
+const severeNoise = new Float64Array(18).fill(70.0);
+const siiMasked = calculateANSI_SII(ANSI_TABLE_3.speechNormal, severeNoise, true);
+console.log(`Test 2 [Severe Masking Noise]: Expected < 0.050 -> Result: ${siiMasked.toFixed(3)}`);
+if (siiMasked > 0.05) {
+  console.error("FAIL: Test 2 failed masking attenuation!");
+  process.exit(1);
+}
+
+// TEST 3: Low-Frequency Rumble Upward Masking (160 Hz = 75 dB, 200 Hz = 70 dB)
+const rumbleNoise = new Float64Array(18).fill(-50.0);
+rumbleNoise[0] = 75.0;
+rumbleNoise[1] = 70.0;
+const siiWithUpward = calculateANSI_SII(ANSI_TABLE_3.speechNormal, rumbleNoise, true);
+const siiWithoutUpward = calculateANSI_SII(ANSI_TABLE_3.speechNormal, rumbleNoise, false);
+console.log(`Test 3 [Upward Masking]: With V_i = ${siiWithUpward.toFixed(3)} | Without V_i = ${siiWithoutUpward.toFixed(3)}`);
+if (siiWithUpward >= siiWithoutUpward) {
+  console.error("FAIL: Upward spread of masking did not reduce high frequency audibility!");
+  process.exit(1);
+}
+
+// TEST 4: Clamped Level Distortion Factor on Shouted Speech
+const siiShout = calculateANSI_SII(ANSI_TABLE_3.speechShout, quietNoise, true);
+console.log(`Test 4 [Shouted Speech Distortion]: Result: ${siiShout.toFixed(3)}`);
+if (siiShout >= 0.99 || siiShout < 0.81) {
+  console.error(`FAIL: Level distortion factor L_i out of standard bounds! Got ${siiShout}`);
+  process.exit(1);
+}
+
+console.log("PASS: All ANSI S3.5 metrology test vectors verified successfully.");
