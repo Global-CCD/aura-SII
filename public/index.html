@@ -3,13 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="Speech Intelligibility Index (SII) Pro DSP Analyzer with Light/Dark Theme & Dual-Database Telemetry Logger.">
-  <title>Speech Intelligibility Index (SII) Pro - v2.1.0</title>
+  <meta name="description" content="Speech Intelligibility Index (SII) Pro DSP Analyzer with Light/Dark Theme, Dual DB Logging & Cross-Device Microphone Profiler.">
+  <title>Speech Intelligibility Index (SII) Pro - v2.2.0</title>
 
   <style>
-    /* --------------------------------------------------------------------------
-       THEME SYSTEM (LIGHT DEFAULT, DYNAMIC DARK MODE)
-       -------------------------------------------------------------------------- */
     :root, [data-theme="light"] {
       --bg-canvas: #f6f8fa;
       --bg-surface: #ffffff;
@@ -175,7 +172,7 @@
     }
 
     @media (min-width: 1024px) {
-      main { grid-template-columns: 400px 1fr; }
+      main { grid-template-columns: 420px 1fr; }
     }
 
     .panel {
@@ -319,6 +316,24 @@
       accent-color: var(--accent-blue);
     }
 
+    .hardware-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+
+    .hardware-meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+    }
+
     .canvas-container {
       position: relative;
       width: 100%;
@@ -351,9 +366,6 @@
     }
     .band-inspect-bar strong { color: var(--accent-cyan); }
 
-    /* --------------------------------------------------------------------------
-       LOGGER & TELEMETRY SECTION
-       -------------------------------------------------------------------------- */
     .logger-section {
       grid-column: 1 / -1;
       background: var(--bg-surface);
@@ -479,7 +491,7 @@
         <path d="M12 2v20M17 5v14M7 9v6M22 10v4M2 11v2"/>
       </svg>
       <h1>Speech Intelligibility Index Pro</h1>
-      <span class="badge-std">v2.1.0 &bull; Dual-DB Logger</span>
+      <span class="badge-std">v2.2.0 &bull; Hardware Profiler</span>
     </div>
 
     <div class="header-actions">
@@ -513,6 +525,31 @@
           <svg id="playIcon" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           <span id="toggleBtnText">Start Real-Time Analysis</span>
         </button>
+
+        <!-- Hardware & Cross-Device Microphone Detection Panel -->
+        <div class="control-group">
+          <label for="micSelect">Local Device Microphone
+            <span class="value-tag" id="micTypeTag">Auto Detecting...</span>
+          </label>
+          <select id="micSelect">
+            <option value="default">Default System Microphone</option>
+          </select>
+        </div>
+
+        <div class="hardware-card" id="hardwareCard">
+          <div class="hardware-meta-row">
+            <span>Host Device Profile:</span>
+            <strong id="hostDeviceLabel" style="color:var(--text-main);">Detecting...</strong>
+          </div>
+          <div class="hardware-meta-row">
+            <span>Audio Interface Type:</span>
+            <strong id="micCategoryLabel" style="color:var(--accent-cyan);">Hardware Input</strong>
+          </div>
+          <div class="hardware-meta-row">
+            <span>Acoustic Transfer:</span>
+            <span id="micQualityLabel" style="font-family:var(--font-mono); font-size:0.75rem;">Calibrated 48 kHz / 24-bit</span>
+          </div>
+        </div>
 
         <div class="control-group">
           <label for="vocalEffortSelect">Standard Vocal Effort
@@ -573,9 +610,7 @@
       </div>
     </section>
 
-    <!-- ----------------------------------------------------------------------
-         RECORDING & DUAL-DATABASE LOGGER PANEL
-         ---------------------------------------------------------------------- -->
+    <!-- RECORDING & DUAL-DATABASE LOGGER PANEL -->
     <section class="logger-section">
       <div class="logger-header">
         <div>
@@ -593,7 +628,6 @@
       </div>
 
       <div class="logger-grid">
-        <!-- DB 1: Measurements DB -->
         <div class="db-card">
           <div class="db-card-header">
             <h3>Database 1: SIIMeasurementsDB</h3>
@@ -607,7 +641,6 @@
           </div>
         </div>
 
-        <!-- DB 2: Telemetry DB -->
         <div class="db-card">
           <div class="db-card-header">
             <h3>Database 2: SIITelemetryDB</h3>
@@ -646,7 +679,7 @@
   </main>
 
   <footer>
-    <p>Speech Intelligibility Index (SII) Pro v2.1.0 &bull; Light/Dark Modes &bull; Isolated IndexedDB Dual-Logger</p>
+    <p>Speech Intelligibility Index (SII) Pro v2.2.0 &bull; Light/Dark Modes &bull; Cross-Device Hardware Mic Profiler</p>
   </footer>
 
   <script>
@@ -690,15 +723,73 @@
     });
 
     /**
+     * CROSS-DEVICE & HARDWARE MICROPHONE CLASSIFIER
+     * Detects host platform (Desktop, Laptop, Tablet, Smartphone) and classifies
+     * microphones as Built-in, USB Interface, Bluetooth Wireless, or Analog.
+     */
+    class DeviceProfiler {
+      static detectHost() {
+        const ua = navigator.userAgent;
+        let formFactor = 'Desktop Workstation';
+        let os = 'Unknown OS';
+
+        // Check Operating System
+        if (/Macintosh|MacIntel|MacPPC/i.test(ua)) os = 'macOS';
+        else if (/iPhone|iPod/i.test(ua)) os = 'iOS';
+        else if (/iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) os = 'iPadOS';
+        else if (/Android/i.test(ua)) os = 'Android';
+        else if (/Windows/i.test(ua)) os = 'Windows';
+        else if (/Linux/i.test(ua)) os = 'Linux';
+
+        // Check Form Factor
+        const isTouch = navigator.maxTouchPoints > 0;
+        const isMobileScreen = window.matchMedia('(max-width: 768px)').matches;
+
+        if (os === 'iOS' || (os === 'Android' && /Mobile/i.test(ua))) {
+          formFactor = 'Smartphone';
+        } else if (os === 'iPadOS' || (os === 'Android' && !/Mobile/i.test(ua))) {
+          formFactor = 'Tablet';
+        } else if (os === 'macOS') {
+          // Detect MacBook vs Desktop Mac via screen dimensions & touch bar / battery hints
+          const isMacBook = window.screen.height <= 1200 && window.screen.width <= 1920;
+          formFactor = isMacBook ? 'Laptop (MacBook)' : 'Desktop (Mac)';
+        } else if (os === 'Windows' || os === 'Linux') {
+          formFactor = (isTouch && isMobileScreen) ? 'Laptop / 2-in-1' : 'Desktop / PC';
+        }
+
+        return { formFactor, os, label: `${formFactor} (${os})` };
+      }
+
+      static classifyMicrophone(label) {
+        const l = (label || '').toLowerCase();
+        if (!l) {
+          return { type: 'default', category: 'System Default Microphone', icon: '🎙️', note: 'Standard Audio Input' };
+        }
+
+        if (/bluetooth|airpods|buds|wireless|hands-free|wh-1000|wf-1000|bose|jabra|plantronics/i.test(l)) {
+          return { type: 'bluetooth', category: 'Bluetooth Wireless Headset', icon: '🎧', note: 'Wideband Wireless (16-48 kHz)' };
+        }
+        if (/usb|yeti|shure|rode|focusrite|scarlett|quadcast|hyperx|elgato|samson|fifine|audio-technica|behringer|mv7|nt-usb/i.test(l)) {
+          return { type: 'usb', category: 'USB Digital Interface', icon: '🎛️', note: 'Studio Digital Audio' };
+        }
+        if (/line\s*in|external|3\.5mm|jack|headset\s*mic/i.test(l)) {
+          return { type: 'external', category: 'External Analog 3.5mm Mic', icon: '🔌', note: 'Analog Line Audio' };
+        }
+        if (/built-in|internal|microphone array|integrated|macbook|iphone|ipad|default/i.test(l)) {
+          return { type: 'builtin', category: 'Built-in Hardware Microphone', icon: '💻', note: 'Integrated Acoustic Array' };
+        }
+
+        return { type: 'generic', category: 'Hardware Audio Input', icon: '🎙️', note: 'Hardware Input Bus' };
+      }
+    }
+
+    /**
      * DUAL INDEXEDDB ISOLATED LOGGER
-     * Database 1: SIIMeasurementsDB
-     * Database 2: SIITelemetryDB
      */
     class SIIDualLogger {
       constructor() {
         this.dbMeasurements = null;
         this.dbTelemetry = null;
-        this.isReady = false;
         this.initDatabases();
       }
 
@@ -706,9 +797,8 @@
         try {
           this.dbMeasurements = await this.openDB('SIIMeasurementsDB', 'measurements');
           this.dbTelemetry = await this.openDB('SIITelemetryDB', 'telemetry');
-          this.isReady = true;
         } catch (e) {
-          console.warn('IndexedDB initialization failed; running in-memory fallback.', e);
+          console.warn('IndexedDB fallback active.', e);
         }
       }
 
@@ -777,7 +867,7 @@
     }
 
     /**
-     * ANSI S3.5 DSP Engine
+     * ANSI S3.5-1997 Production DSP Engine
      */
     class ProductionSIIDSPEngine {
       constructor() {
@@ -790,6 +880,7 @@
 
         this.isRunning = false;
         this.stream = null;
+        this.selectedDeviceId = 'default';
         this.fftSize = 4096;
         this.fftDataBuffer = null;
         this.binMapping = null;
@@ -848,22 +939,38 @@
         }
       }
 
-      async startMicrophone() {
+      async startMicrophone(deviceId = null) {
         await this.initContext();
         this.stopMockSignal();
-        if (this.stream && this.sourceNode) {
-          this.isRunning = true;
-          return { success: true };
+
+        if (deviceId) this.selectedDeviceId = deviceId;
+
+        if (this.stream) {
+          this.stream.getTracks().forEach(t => t.stop());
+          this.stream = null;
         }
+
         try {
-          this.stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+          const constraints = {
+            audio: {
+              deviceId: this.selectedDeviceId && this.selectedDeviceId !== 'default'
+                ? { exact: this.selectedDeviceId }
+                : undefined,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            },
             video: false
-          });
+          };
+
+          this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (this.sourceNode) {
+            try { this.sourceNode.disconnect(); } catch (e) {}
+          }
           this.sourceNode = this.audioCtx.createMediaStreamSource(this.stream);
           this.sourceNode.connect(this.dcBlockFilter);
           this.isRunning = true;
-          return { success: true };
+          return { success: true, stream: this.stream };
         } catch (err) {
           return { success: false, error: err };
         }
@@ -954,26 +1061,44 @@
           this.liveNoiseEnvelope[i] += (m < this.liveNoiseEnvelope[i] ? alphaNoiseFall : alphaNoiseRise) * (m - this.liveNoiseEnvelope[i]);
         }
 
-        const disturbanceSpectrum = new Float32Array(numBands);
-        let cumulativeUpward = -999.0;
+        // Rigorous ANSI S3.5 Upward Spread of Masking (§4.3.2.1 - §4.3.2.5)
+        const V = new Float32Array(numBands);
+        const B = new Float32Array(numBands);
+        const C = new Float32Array(numBands);
+        const sixth = Math.pow(2, 1 / 6);
 
         for (let i = 0; i < numBands; i++) {
           const E_i = (this.opMode === 'ambient') ? stdSpeechSpectrum[i] : this.liveSpeechEnvelope[i];
           const N_i = (this.opMode === 'ambient') ? measuredSpectrumNoise[i] : this.liveNoiseEnvelope[i];
-          const X_i = ANSI_TABLE_3.internalNoise[i];
 
-          if (i > 0) {
-            const B_prev = Math.max(this.bandSpectrumSpeech[i - 1], disturbanceSpectrum[i - 1]);
-            const C_i = 0.6 * (B_prev + 10 * Math.log10(ANSI_TABLE_3.bands[i - 1])) - 6.35;
-            const V_i = B_prev - 3.32 * C_i * Math.log10(ANSI_TABLE_3.bands[i] / ANSI_TABLE_3.bands[i - 1]);
-            cumulativeUpward = Math.max(cumulativeUpward - 15.0, V_i);
-          }
+          V[i] = E_i - 24.0;
+          B[i] = Math.max(V[i], N_i);
 
-          const D_i = Math.max(N_i, X_i, cumulativeUpward);
-          disturbanceSpectrum[i] = D_i;
+          const deltaF = BAND_EDGES[i].deltaF;
+          C[i] = -80.0 + 0.6 * (B[i] + 10.0 * Math.log10(deltaF));
           this.bandSpectrumSpeech[i] = E_i;
-          this.bandSpectrumDisturbance[i] = D_i;
         }
+
+        const disturbanceSpectrum = new Float32Array(numBands);
+        disturbanceSpectrum[0] = Math.max(B[0], ANSI_TABLE_3.internalNoise[0]);
+
+        for (let i = 1; i < numBands; i++) {
+          let sumUpward = 0.0;
+          for (let k = 0; k < i; k++) {
+            const h_k = BAND_EDGES[k].fHigh;
+            const F_i = ANSI_TABLE_3.bands[i];
+            if (F_i > h_k) {
+              const octaves = 3.32 * Math.log10(F_i / h_k);
+              const maskK = B[k] + C[k] * octaves;
+              sumUpward += Math.pow(10.0, 0.1 * maskK);
+            }
+          }
+          const N_i = (this.opMode === 'ambient') ? measuredSpectrumNoise[i] : this.liveNoiseEnvelope[i];
+          const Z_i = 10.0 * Math.log10(Math.pow(10.0, 0.1 * N_i) + sumUpward);
+          disturbanceSpectrum[i] = Math.max(Z_i, ANSI_TABLE_3.internalNoise[i]);
+        }
+
+        this.bandSpectrumDisturbance = disturbanceSpectrum;
 
         let frameSII = 0.0;
         for (let i = 0; i < numBands; i++) {
@@ -1003,7 +1128,7 @@
     }
 
     /**
-     * Theme-Aware Precision Visualizer
+     * Theme-Aware Visualizer
      */
     class SIISpectrumVisualizer {
       constructor(canvas, engine) {
@@ -1155,7 +1280,7 @@
     }
 
     /**
-     * UI Coordinator & Session Recording Engine
+     * UI Coordinator & Hardware Microphone Detection Controller
      */
     class SIIAppUI {
       constructor() {
@@ -1170,17 +1295,18 @@
         this.isRecording = false;
         this.recordingSessionId = null;
         this.recordingStartTime = 0;
-        this.recIntervalTimer = null;
         this.lastTelemetryLogTime = 0;
         this.lastMeasurementLogTime = 0;
 
         this.cacheDom();
         this.initTheme();
+        this.initHostDeviceProfiler();
         this.initTable();
         this.bindEvents();
         this.initVisualizer();
         this.startLoop();
         this.refreshDBCounts();
+        this.enumerateMicrophones();
       }
 
       cacheDom() {
@@ -1197,6 +1323,11 @@
           siiMainDisplay: document.getElementById('siiMainDisplay'),
           siiSubDisplay: document.getElementById('siiSubDisplay'),
           siiQualityBadge: document.getElementById('siiQualityBadge'),
+          micSelect: document.getElementById('micSelect'),
+          micTypeTag: document.getElementById('micTypeTag'),
+          hostDeviceLabel: document.getElementById('hostDeviceLabel'),
+          micCategoryLabel: document.getElementById('micCategoryLabel'),
+          micQualityLabel: document.getElementById('micQualityLabel'),
           vocalEffortSelect: document.getElementById('vocalEffortSelect'),
           effortSplTag: document.getElementById('effortSplTag'),
           opModeSelect: document.getElementById('opModeSelect'),
@@ -1206,7 +1337,6 @@
           mockSignalSelect: document.getElementById('mockSignalSelect'),
           spectrumCanvas: document.getElementById('spectrumCanvas'),
           ansiTableBody: document.getElementById('ansiConstantsTable').querySelector('tbody'),
-          // Logger controls
           recToggleBtn: document.getElementById('recToggleBtn'),
           recBtnText: document.getElementById('recBtnText'),
           recDot: document.getElementById('recDot'),
@@ -1223,7 +1353,6 @@
       }
 
       initTheme() {
-        // LIGHT MODE BY DEFAULT
         const savedTheme = localStorage.getItem('sii_theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
         this.updateThemeIcons(savedTheme);
@@ -1246,6 +1375,47 @@
           this.dom.themeIconSun.style.display = 'none';
           this.dom.themeIconMoon.style.display = 'block';
         }
+      }
+
+      initHostDeviceProfiler() {
+        const profile = DeviceProfiler.detectHost();
+        this.dom.hostDeviceLabel.textContent = profile.label;
+      }
+
+      async enumerateMicrophones() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+          this.dom.micSelect.innerHTML = '';
+          if (audioInputs.length === 0) {
+            this.dom.micSelect.innerHTML = '<option value="default">Default Hardware Microphone</option>';
+            return;
+          }
+
+          audioInputs.forEach((dev, index) => {
+            const classification = DeviceProfiler.classifyMicrophone(dev.label);
+            const opt = document.createElement('option');
+            opt.value = dev.deviceId;
+            opt.textContent = `${classification.icon} ${dev.label || `Microphone ${index + 1}`} (${classification.category})`;
+            this.dom.micSelect.appendChild(opt);
+          });
+
+          this.updateActiveMicProfile(this.dom.micSelect.value);
+        } catch (e) {
+          console.warn('Microphone enumeration notice:', e);
+        }
+      }
+
+      updateActiveMicProfile(deviceId) {
+        const selectedOpt = this.dom.micSelect.selectedOptions[0];
+        const label = selectedOpt ? selectedOpt.textContent : '';
+        const classification = DeviceProfiler.classifyMicrophone(label);
+
+        this.dom.micTypeTag.textContent = classification.category.split(' ')[0];
+        this.dom.micCategoryLabel.textContent = `${classification.icon} ${classification.category}`;
+        this.dom.micQualityLabel.textContent = classification.note;
       }
 
       initTable() {
@@ -1281,6 +1451,21 @@
             this.dom.playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
           }
         });
+
+        // Microphone Selection Switcher
+        this.dom.micSelect.addEventListener('change', async (e) => {
+          const deviceId = e.target.value;
+          this.updateActiveMicProfile(deviceId);
+          if (this.engine.isRunning) {
+            await this.engine.startMicrophone(deviceId);
+            this.updateStatus('Mic Switched', 'active');
+          }
+        });
+
+        // Hardware device change listener (USB/Bluetooth hot-plugging)
+        if (navigator.mediaDevices) {
+          navigator.mediaDevices.addEventListener('devicechange', () => this.enumerateMicrophones());
+        }
 
         this.dom.vocalEffortSelect.addEventListener('change', (e) => {
           this.engine.vocalEffort = e.target.value;
@@ -1318,7 +1503,6 @@
           }
         });
 
-        // Recording & Logger Buttons
         this.dom.recToggleBtn.addEventListener('click', () => this.toggleRecording());
         this.dom.exportMeasCsvBtn.addEventListener('click', () => this.exportMeasurements('csv'));
         this.dom.exportMeasJsonBtn.addEventListener('click', () => this.exportMeasurements('json'));
@@ -1341,8 +1525,10 @@
 
       async startAnalysis() {
         this.updateStatus('Acquiring Microphone...', 'idle');
-        const res = await this.engine.startMicrophone();
+        const selectedId = this.dom.micSelect.value;
+        const res = await this.engine.startMicrophone(selectedId);
         if (res.success) {
+          await this.enumerateMicrophones();
           this.updateStatus('Live Mic Calibrated', 'active');
           this.dom.toggleBtnText.textContent = 'Pause Analysis';
           this.dom.playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
@@ -1365,9 +1551,7 @@
 
       toggleRecording() {
         if (!this.isRecording) {
-          if (!this.engine.isRunning) {
-            this.startAnalysis();
-          }
+          if (!this.engine.isRunning) this.startAnalysis();
           this.isRecording = true;
           this.recordingSessionId = `SII_${Date.now()}`;
           this.recordingStartTime = performance.now();
@@ -1389,7 +1573,6 @@
           this.engine.processFrame(now);
           if (this.visualizer) this.visualizer.draw();
 
-          // Live Recording Dispatcher
           if (this.isRecording && this.engine.isRunning) {
             const elapsed = Math.floor((now - this.recordingStartTime) / 1000);
             const hrs = String(Math.floor(elapsed / 3600)).padStart(2, '0');
@@ -1397,7 +1580,6 @@
             const secs = String(elapsed % 60).padStart(2, '0');
             this.dom.recTimer.textContent = `${hrs}:${mins}:${secs}`;
 
-            // Telemetry at 5 Hz (every 200ms)
             if (now - this.lastTelemetryLogTime >= 200) {
               const bandsData = [];
               for (let i = 0; i < ANSI_TABLE_3.bands.length; i++) {
@@ -1419,7 +1601,6 @@
               this.lastTelemetryLogTime = now;
             }
 
-            // Measurements at 1 Hz (every 1000ms)
             if (now - this.lastMeasurementLogTime >= 1000) {
               const avgSNR = (this.engine.bandSNR.reduce((a, b) => a + b, 0) / this.engine.bandSNR.length).toFixed(2);
               this.logger.logMeasurement({
